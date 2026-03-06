@@ -29,11 +29,13 @@ if __name__ == '__main__':
     args = vars(parser.parse_args())
     print(args)
     n_classes = 10
-    data = ld.LoadData(args['train'], n_classes)
+    Traindata = ld.LoadData(args['train'], n_classes)
     sizes = args['sizes'].split(',')
     size = list(map(int, sizes))
     NN = NeuralNetwork.NeuralNetwork(784, 10, size, args['activation'], args['loss'])
-    NN.gradient_descent(data.x, data.y, args["lr"], args['loss'])
+    NN.gradient_descent(Traindata.x, Traindata.y, args["lr"], args['loss'])
+    Testdata = ld.LoadData(args['test'], n_classes)
+
     print(data.xshape())
 
 

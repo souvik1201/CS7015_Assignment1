@@ -14,13 +14,21 @@ class NeuralNetwork(object):
     loss_function = ''
     layerInput = []
     layerOutput = []
+    grad_a = []
+    grad_h = []
+    grad_w = []
+    grad_b = []
     def __init__(self, Input, output, size, g, loss_function):
-        self.layers = len(size)
         self.neurons = [Input] + size + [output]
+        self.layers = len(self.neurons) - 1
         self.activations = [g] * (self.layers + 2)
         self.weights = [np.random.randn(y, x)* 2/np.sqrt(x+y) for x,y in zip(self.neurons[:-1], self.neurons[1:])]
         self.biases = [np.zeros((x, 1)) for x in self.neurons[1:]]
         self.loss_function = loss_function
+        self.grad_a = [np.zeros((self.neurons[i], 1)) for i in range(len(self.neurons))]
+        self.grad_h = [np.zeros((n, 1)) for n in self.neurons]
+        self.grad_w = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
+        self.grad_b = [np.zeros((x, 1)) for x in self.neurons[1:]]
 
 
     def sigmoid(self, x, derivative = False):
@@ -52,6 +60,12 @@ class NeuralNetwork(object):
             return self.tanh(z)
         return None
 
+    def softmax(self, x):
+        x = x - np.max(x)
+        numer = np.exp(x)
+        denom = np.sum(numer, axis = 0)
+        return numer / denom
+
     def forward_propagation(self, x):
         self.layerInput = []
         self.layerOutput = []
@@ -62,69 +76,95 @@ class NeuralNetwork(object):
         h = []
         a = []
         # a.append(x[0:1, :].T)
-        x = x.reshape(1, -1)
-        h.append(x.T)
+        x = x.reshape(-1, 1)
+        a.append(x)
+        h.append(x)
         # layer = 3 -> layer + 2 = 5 -> loop 1, 2, 3, 4
-        for k in range(1, self.layers + 2):
+        for k in range(self.layers):
             # Pre-activation
             # print(h[k - 1].shape)
-            assert W[k - 1].shape[1] == h[k - 1].shape[0]
-            a.append(np.matmul(W[k - 1], h[k - 1]) + b[k - 1])
+            assert W[k].shape[1] == h[k].shape[0]
+            a.append(np.matmul(W[k], h[k]) + b[k])
             #Storing Zs
-            self.layerInput.append(a[k - 1])
+            self.layerInput.append(a[k])
             # print(a[k - 1].shape)
             # Activation
-            h.append(self.activate(a[k - 1], self.activations[k - 1]))
+            if k != self.layers - 1:
+                h.append(self.activate(a[k + 1], self.activations[k]))
+            else:
+                h.append(self.softmax(a[k + 1]))
             # print(h[k - 1].shape)
             #Storing As
             # print("Actual h = %s as per layer = %s \n", h[k - 1], k)
-            self.layerOutput.append(h[k])
+            self.layerOutput.append(h[k + 1])
         yhat = self.layerOutput[-1]
         # print(len(yhat))
         return yhat, a, h
 
     def back_propagation(self, h, a, loss_function, y, yhat, W, activation):
-        grad_a = [np.zeros((self.neurons[i], 1)) for i in range(len(self.neurons))]
-        grad_h = [np.zeros((self.neurons[i], 1)) for i in range(self.layers + 1)]
-        grad_w = [np.zeros((y, x)) for x,y in zip(self.neurons[:-1], self.neurons[1:])]
-        grad_b = [np.zeros((x, 1)) for x in self.neurons[1:]]
         error = 0
         L = len(self.neurons) - 1
         if loss_function.lower() == 'sq':
             y = y.reshape(-1, 1)
-            grad_a[L] =  yhat - y
+            self.grad_a[L] =  yhat - y
             error = self.loss(y, yhat)
+        # h and a is following 1 indexing
         for layer in reversed(range(L)):
-            grad_w[layer] = np.dot(grad_a[layer + 1], h[layer].T)
-            grad_b[layer] = grad_a[layer + 1]
-            grad_h[layer] = np.dot(W[layer].T, grad_a[layer + 1])
+            self.grad_w[layer] = np.dot(self.grad_a[layer + 1], h[layer].T)
+            self.grad_b[layer] = self.grad_a[layer + 1]
+            self.grad_h[layer] = np.dot(W[layer].T, self.grad_a[layer + 1])
             gdash = 0
-            if layer > 0:
-                if activation == 'sigmoid':
-                    gdash = self.sigmoid(a[layer - 1], True)
-                elif activation == 'tanh':
-                    gdash = self.tanh(a[layer - 1], True)
-                grad_a[layer] = grad_h[layer] * gdash
-        return grad_w, grad_b, error
+            if activation == 'sigmoid':
+                gdash = self.sigmoid(a[layer], True)
+            elif activation == 'tanh':
+                gdash = self.tanh(a[layer], True)
+            self.grad_a[layer] = self.grad_h[layer] * gdash
+        return self.grad_w, self.grad_b, error
 
     def gradient_descent(self, X, Y, eta, loss_function):
         epoch = 0
         w = self.weights
         b = self.biases
-        w_old = w
-        b_old = b
-        grad_ws = []
-        grad_bs = []
-        max_iter = 1000
+        max_iter = 20
         while epoch < max_iter:
             loss = 0
+            grad_ws = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
+            grad_bs = [np.zeros((x, 1)) for x in self.neurons[1:]]
             for x, y in zip(X, Y):
                 yhat, a, h = self.forward_propagation(x)
-                grad_ws, grad_bs, loss = self.back_propagation(h, a, loss_function, y, yhat, w, activation = 'sigmoid')
-            for layer, (grad_w, grad_b) in enumerate(zip(grad_ws, grad_bs)):
-                w[layer] = w[layer] - eta * grad_w
-                b[layer] = b[layer] - eta * grad_b
-                w_old[layer] = w[layer]
-                b_old[layer] = b[layer]
+                grad_w, grad_b, loss = self.back_propagation(h, a, loss_function, y, yhat, w, activation = 'sigmoid')
+                grad_ws += grad_w
+                grad_bs += grad_b
+            w = w - eta * grad_ws
+            b = b - eta * grad_bs
             print("Update for epoch %s completed with loss = %s" %(epoch, loss))
             epoch = epoch + 1
+
+    def predictionlable(self, y):
+        return y.index(max(y))
+    def test(self, X , Y):
+        W = self.weights
+        b = self.biases
+        correct = 0
+        for x, y in zip(X, Y):
+            h = []
+            a = []
+            layerInput = []
+            layerOutput = []
+            x = x.reshape(-1, 1)
+            h.append(x)
+            # layer = 3 -> layer + 2 = 5 -> loop 1, 2, 3, 4
+            for k in range(self.layers):
+                # Pre-activation
+                assert W[k].shape[1] == h[k].shape[0]
+                a.append(np.matmul(W[k], h[k]) + b[k])
+                # Storing Zs
+                layerInput.append(a[k])
+                # Activation
+                h.append(self.activate(a[k], self.activations[k]))
+                layerOutput.append(h[k])
+            yhat = layerOutput[-1]
+            if self.predictionlable(yhat) == y:
+                correct += 1
+
+        return correct / float(len(X))
