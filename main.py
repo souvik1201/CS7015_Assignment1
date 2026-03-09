@@ -3,7 +3,7 @@ CS7015: A course on deep learning, assignment 3
 Authos: Souvik
 """
 import numpy as np
-
+import pandas as pd
 import NeuralNetwork
 import NeuralNetwork as nn
 import LoadData as ld
@@ -30,13 +30,24 @@ if __name__ == '__main__':
     print(args)
     n_classes = 10
     Traindata = ld.LoadData(args['train'], n_classes)
+    Valdata = ld.LoadData(r"C:\Users\souvi\PycharmProjects\Data\val.csv", n_classes)
     sizes = args['sizes'].split(',')
     size = list(map(int, sizes))
     NN = NeuralNetwork.NeuralNetwork(784, 10, size, args['activation'], args['loss'])
-    NN.gradient_descent(Traindata.x, Traindata.y, args["lr"], args['loss'])
-    Testdata = ld.LoadData(args['test'], n_classes)
-
-    print(data.xshape())
+    NN.gradient_descent(Traindata.x, Traindata.y, Valdata.x, Valdata.y, args["lr"], args['loss'], args['batch_size'])
+    Testdata = pd.read_csv(args['test'])
+    Testdata = Testdata.to_numpy()
+    image_id = Testdata[:, 0:1]
+    Testdata = Testdata[:, 1:]
+    TestPrediction = []
+    for image, x_test in zip(image_id, Testdata):
+        yhat, a, h = NN.forward_propagation(x_test)
+        TestPrediction.append([np.argmax(yhat)])
+    submit = pd.DataFrame(columns = ["id", "label"])
+    submit['id'] = list(map(int, image_id))
+    submit['label'] = list(map(int, TestPrediction))
+    result = submit.sort_values(by=['label'], ascending=False)
+    result.to_csv(args['expt_dir'] + 'result.csv', index = False, sep=',')
 
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/

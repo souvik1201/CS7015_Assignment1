@@ -2,6 +2,7 @@
 CS7015: A course on deep learning, assignment 3Authos: Souvik
 """
 import numpy as np
+from sklearn.metrics import log_loss
 
 class NeuralNetwork(object):
     layers = 0
@@ -32,6 +33,7 @@ class NeuralNetwork(object):
 
 
     def sigmoid(self, x, derivative = False):
+        x = np.clip(x, -500, 500)
         if not derivative:
             return 1 / (1 + np.exp(-x))
         else:
@@ -50,7 +52,7 @@ class NeuralNetwork(object):
         if self.loss_function.lower() == 'sq':
             return np.sum(np.square(x - y))
         elif self.loss_function.lower() == 'ce':
-            return -1 * y * np.log(x)
+            return -np.sum(y * np.log(x + 1e-9))
         return None
 
     def activate(self, z, activation):
@@ -104,10 +106,10 @@ class NeuralNetwork(object):
     def back_propagation(self, h, a, loss_function, y, yhat, W, activation):
         error = 0
         L = len(self.neurons) - 1
-        if loss_function.lower() == 'sq':
+        if loss_function.lower() == 'ce':
             y = y.reshape(-1, 1)
             self.grad_a[L] =  yhat - y
-            error = self.loss(y, yhat)
+            error = self.loss(yhat, y)
         # h and a is following 1 indexing
         for layer in reversed(range(L)):
             self.grad_w[layer] = np.dot(self.grad_a[layer + 1], h[layer].T)
@@ -119,25 +121,43 @@ class NeuralNetwork(object):
             elif activation == 'tanh':
                 gdash = self.tanh(a[layer], True)
             self.grad_a[layer] = self.grad_h[layer] * gdash
-        return self.grad_w, self.grad_b, error
+        return self.grad_w, self.grad_b
 
-    def gradient_descent(self, X, Y, eta, loss_function):
+    def gradient_descent(self, X, Y, X_val, Y_val,eta, loss_function, batch):
         epoch = 0
         w = self.weights
         b = self.biases
-        max_iter = 20
+        max_iter = 100
+        loss = 0
         while epoch < max_iter:
-            loss = 0
             grad_ws = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
             grad_bs = [np.zeros((x, 1)) for x in self.neurons[1:]]
+            current_batch = 0
+            accuracy = 0
             for x, y in zip(X, Y):
                 yhat, a, h = self.forward_propagation(x)
-                grad_w, grad_b, loss = self.back_propagation(h, a, loss_function, y, yhat, w, activation = 'sigmoid')
-                grad_ws += grad_w
-                grad_bs += grad_b
-            w = w - eta * grad_ws
-            b = b - eta * grad_bs
-            print("Update for epoch %s completed with loss = %s" %(epoch, loss))
+                grad_w, grad_b = self.back_propagation(h, a, loss_function, y, yhat, w, activation = 'sigmoid')
+                current_batch += 1
+                for i in range(len(grad_ws)):
+                    grad_ws[i] += grad_w[i]
+                    grad_bs[i] += grad_b[i]
+                if current_batch == batch:
+                    current_batch = 0
+                    for i in range(len(self.weights)):
+                        self.weights[i] -= eta * grad_ws[i]/batch
+                        self.biases[i] -= eta * grad_bs[i]/batch
+                    grad_ws = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
+                    grad_bs = [np.zeros((x, 1)) for x in self.neurons[1:]]
+            loss = 0
+            correct = 0
+            for x_val, y_val in zip(X_val, Y_val):
+                yhat_val, a_val, h_val = self.forward_propagation(x_val)
+                loss += log_loss(y_val, yhat_val)
+                if np.argmax(yhat_val) == np.argmax(y_val):
+                    correct += 1
+            accuracy = correct / float(len(X_val)) * 100
+            loss /= float(len(X_val))
+            print("Update for epoch %s completed with loss = %s with accurecy = %s" %(epoch + 1, loss, accuracy))
             epoch = epoch + 1
 
     def predictionlable(self, y):
@@ -164,7 +184,7 @@ class NeuralNetwork(object):
                 h.append(self.activate(a[k], self.activations[k]))
                 layerOutput.append(h[k])
             yhat = layerOutput[-1]
-            if self.predictionlable(yhat) == y:
+            if self.predictionlable(yhat) == self.predictionlable(y):
                 correct += 1
 
         return correct / float(len(X))
