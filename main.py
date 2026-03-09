@@ -34,7 +34,8 @@ if __name__ == '__main__':
     sizes = args['sizes'].split(',')
     size = list(map(int, sizes))
     NN = NeuralNetwork.NeuralNetwork(784, 10, size, args['activation'], args['loss'])
-    NN.gradient_descent(Traindata.x, Traindata.y, Valdata.x, Valdata.y, args["lr"], args['loss'], args['batch_size'])
+    #NN.gradient_descent(Traindata.x, Traindata.y, Valdata.x, Valdata.y, args["lr"], args['loss'], args['batch_size'])
+    NN.momemtum_gradient_descent(Traindata.x, Traindata.y, Valdata.x, Valdata.y, args["lr"], args['momentum'], args['loss'], args['batch_size'])
     Testdata = pd.read_csv(args['test'])
     Testdata = Testdata.to_numpy()
     image_id = Testdata[:, 0:1]
@@ -44,8 +45,8 @@ if __name__ == '__main__':
         yhat, a, h = NN.forward_propagation(x_test)
         TestPrediction.append([np.argmax(yhat)])
     submit = pd.DataFrame(columns = ["id", "label"])
-    submit['id'] = list(map(int, image_id))
-    submit['label'] = list(map(int, TestPrediction))
+    submit['id'] = image_id
+    submit['label'] = TestPrediction
     result = submit.sort_values(by=['label'], ascending=False)
     result.to_csv(args['expt_dir'] + 'result.csv', index = False, sep=',')
 

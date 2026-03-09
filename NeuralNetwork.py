@@ -123,7 +123,7 @@ class NeuralNetwork(object):
             self.grad_a[layer] = self.grad_h[layer] * gdash
         return self.grad_w, self.grad_b
 
-    def gradient_descent(self, X, Y, X_val, Y_val,eta, loss_function, batch):
+    def gradient_descent(self, X, Y, X_val, Y_val, eta, loss_function, batch):
         epoch = 0
         w = self.weights
         b = self.biases
@@ -146,6 +146,91 @@ class NeuralNetwork(object):
                     for i in range(len(self.weights)):
                         self.weights[i] -= eta * grad_ws[i]/batch
                         self.biases[i] -= eta * grad_bs[i]/batch
+                    grad_ws = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
+                    grad_bs = [np.zeros((x, 1)) for x in self.neurons[1:]]
+            loss = 0
+            correct = 0
+            for x_val, y_val in zip(X_val, Y_val):
+                yhat_val, a_val, h_val = self.forward_propagation(x_val)
+                loss += log_loss(y_val, yhat_val)
+                if np.argmax(yhat_val) == np.argmax(y_val):
+                    correct += 1
+            accuracy = correct / float(len(X_val)) * 100
+            loss /= float(len(X_val))
+            print("Update for epoch %s completed with loss = %s with accurecy = %s" %(epoch + 1, loss, accuracy))
+            epoch = epoch + 1
+
+    def momemtum_gradient_descent(self, X, Y, X_val, Y_val, eta, gamma, loss_function, batch):
+        epoch = 0
+        w = self.weights
+        b = self.biases
+        max_iter = 10
+        w_update = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
+        b_update = [np.zeros((x, 1)) for x in self.neurons[1:]]
+        while epoch < max_iter:
+            grad_ws = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
+            grad_bs = [np.zeros((x, 1)) for x in self.neurons[1:]]
+            current_batch = 0
+            accuracy = 0
+            for x, y in zip(X, Y):
+                yhat, a, h = self.forward_propagation(x)
+                grad_w, grad_b = self.back_propagation(h, a, loss_function, y, yhat, w, activation = 'sigmoid')
+                current_batch += 1
+                for i in range(len(grad_ws)):
+                    grad_ws[i] += grad_w[i]
+                    grad_bs[i] += grad_b[i]
+                if current_batch == batch:
+                    current_batch = 0
+                    for i in range(len(self.weights)):
+                        w_update[i] = gamma * w_update[i] + eta * grad_ws[i] / batch
+                        b_update[i] = gamma * b_update[i] + eta * grad_bs[i] / batch
+                        self.weights[i] = self.weights[i] - w_update[i]
+                        self.biases[i] = self.biases[i] - b_update[i]
+                    grad_ws = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
+                    grad_bs = [np.zeros((x, 1)) for x in self.neurons[1:]]
+            loss = 0
+            correct = 0
+            for x_val, y_val in zip(X_val, Y_val):
+                yhat_val, a_val, h_val = self.forward_propagation(x_val)
+                loss += log_loss(y_val, yhat_val)
+                if np.argmax(yhat_val) == np.argmax(y_val):
+                    correct += 1
+            accuracy = correct / float(len(X_val)) * 100
+            loss /= float(len(X_val))
+            print("Update for epoch %s completed with loss = %s with accurecy = %s" %(epoch + 1, loss, accuracy))
+            epoch = epoch + 1
+
+    def nag(self, X, Y, X_val, Y_val, eta, gamma, loss_function, batch):
+        epoch = 0
+        w = self.weights
+        b = self.biases
+        max_iter = 100
+        w_update = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
+        b_update = [np.zeros((x, 1)) for x in self.neurons[1:]]
+        while epoch < max_iter:
+            grad_ws = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
+            grad_bs = [np.zeros((x, 1)) for x in self.neurons[1:]]
+            w_look = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
+            b_look = [np.zeros((x, 1)) for x in self.neurons[1:]]
+            current_batch = 0
+            accuracy = 0
+            for x, y in zip(X, Y):
+                for i in range(len(w_look)):
+                    w_look[i] = self.weights[i] - gamma * w_update[i]
+                    b_look[i] = self.biases[i] - gamma * b_update[i]
+                yhat, a, h = self.forward_propagation(x, w_look, b_look)
+                grad_w, grad_b = self.back_propagation(h, a, loss_function, y, yhat, w, activation = 'sigmoid')
+                current_batch += 1
+                for i in range(len(grad_ws)):
+                    grad_ws[i] += grad_w[i]
+                    grad_bs[i] += grad_b[i]
+                if current_batch == batch:
+                    current_batch = 0
+                    for i in range(len(self.weights)):
+                        w_update[i] = gamma * w_update[i] + eta * grad_ws[i] / batch
+                        b_update[i] = gamma * b_update[i] + eta * grad_bs[i] / batch
+                        self.weights[i] = self.weights[i] - w_update[i]
+                        self.biases[i] = self.biases[i] - b_update[i]
                     grad_ws = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
                     grad_bs = [np.zeros((x, 1)) for x in self.neurons[1:]]
             loss = 0
