@@ -35,7 +35,8 @@ if __name__ == '__main__':
     size = list(map(int, sizes))
     NN = NeuralNetwork.NeuralNetwork(784, 10, size, args['activation'], args['loss'])
     #NN.gradient_descent(Traindata.x, Traindata.y, Valdata.x, Valdata.y, args["lr"], args['loss'], args['batch_size'])
-    NN.momemtum_gradient_descent(Traindata.x, Traindata.y, Valdata.x, Valdata.y, args["lr"], args['momentum'], args['loss'], args['batch_size'])
+    #NN.momemtum_gradient_descent(Traindata.x, Traindata.y, Valdata.x, Valdata.y, args["lr"], args['momentum'], args['loss'], args['batch_size'])
+    NN.nag(Traindata.x, Traindata.y, Valdata.x, Valdata.y, args["lr"], args['momentum'], args['loss'], args['batch_size'])
     Testdata = pd.read_csv(args['test'])
     Testdata = Testdata.to_numpy()
     image_id = Testdata[:, 0:1]

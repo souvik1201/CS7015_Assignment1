@@ -210,20 +210,22 @@ class NeuralNetwork(object):
         while epoch < max_iter:
             grad_ws = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
             grad_bs = [np.zeros((x, 1)) for x in self.neurons[1:]]
-            w_look = [np.zeros((y, x)) for x, y in zip(self.neurons[:-1], self.neurons[1:])]
-            b_look = [np.zeros((x, 1)) for x in self.neurons[1:]]
             current_batch = 0
             accuracy = 0
             for x, y in zip(X, Y):
-                for i in range(len(w_look)):
-                    w_look[i] = self.weights[i] - gamma * w_update[i]
-                    b_look[i] = self.biases[i] - gamma * b_update[i]
-                yhat, a, h = self.forward_propagation(x, w_look, b_look)
+                original_w = [w.copy() for w in self.weights]
+                original_b = [b.copy() for b in self.biases]
+                for i in range(len(original_w)):
+                    self.weights[i] = self.weights[i] - gamma * w_update[i]
+                    self.biases[i] = self.biases[i] - gamma * b_update[i]
+                yhat, a, h = self.forward_propagation(x)
                 grad_w, grad_b = self.back_propagation(h, a, loss_function, y, yhat, w, activation = 'sigmoid')
                 current_batch += 1
                 for i in range(len(grad_ws)):
                     grad_ws[i] += grad_w[i]
                     grad_bs[i] += grad_b[i]
+                self.weights = original_w
+                self.biases = original_b
                 if current_batch == batch:
                     current_batch = 0
                     for i in range(len(self.weights)):
